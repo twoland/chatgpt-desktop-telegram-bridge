@@ -1,0 +1,33 @@
+# Telegram bot settings.
+[telegram]
+bot_token = "123456:replace-me"
+# Reference only. Prefer the root pairing script, which writes these privately.
+# Replace this synthetic ID with the paired private owner ID.
+primary_chat_id = 123456789
+allowed_chat_ids = [123456789]
+processing_reaction = "👀"
+# Local desktop bridge: waiting for a turn vs confirmed in a turn.
+queued_reaction = "😴"
+seen_reaction = "👀"
+done_reaction = "👌"
+delete_approval_messages = true
+
+[desktop]
+app_path = "/Applications/Codex.app"
+user_data_dir = "~/Library/Application Support/com.openai.chat"
+remote_debugging_port = 9229
+launch_timeout_seconds = 10
+send_ack_timeout_seconds = 3
+poll_interval_seconds = 1
+
+[bridge]
+state_path = "~/.local/state/codex-telegram-bridge/state.json"
+allow_first_private_chat = false
+max_message_chars = 3900
+log_level = "INFO"
+protocol_log_level = "WARNING"
+log_path = "~/.local/state/codex-telegram-bridge/logs/bridge.log"
+protocol_log_path = "~/.local/state/codex-telegram-bridge/logs/protocol.log"
+console_log = false
+log_max_bytes = 10485760
+log_backup_count = 7

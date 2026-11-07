@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codex-telegram-bridge"
+version = "0.1.0"
+description = "Reply-chain Telegram bridge for Codex Desktop"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [
+  {name = "ChatGPT Desktop Telegram Bridge contributors"}
+]
+dependencies = [
+  "httpx>=0.28,<1.0",
+  "telegramify-markdown>=1.1.2,<2.0",
+  "websockets>=15.0,<16.0",
+]
+keywords = ["codex", "telegram", "bot", "bridge", "openai"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Operating System :: MacOS :: MacOS X",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Communications :: Chat",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+Homepage = "https://github.com/twoland/chatgpt-desktop-telegram-bridge"
+Repository = "https://github.com/twoland/chatgpt-desktop-telegram-bridge"
+Issues = "https://github.com/twoland/chatgpt-desktop-telegram-bridge/issues"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0,<9.0",
+  "pytest-asyncio>=0.23,<1.0",
+]
+
+[project.scripts]
+codex-telegram-bridge = "codex_telegram_bridge.local_mode:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+pythonpath = ["..", "src"]

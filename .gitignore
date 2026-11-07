@@ -1,0 +1,24 @@
+# Local credentials, chat routing, delivery history and backups.
+/private/
+/installation.json
+/setup-target.json
+/skills/telegram/bridges.json
+
+# Earlier terminal-only implementation, retained locally for provenance.
+/source/
+
+# Python environments, caches and runtime output.
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.env
+.env.*
+*.log
+*.pid
+.DS_Store
+build/
+dist/

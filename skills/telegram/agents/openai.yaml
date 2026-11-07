@@ -1,0 +1,4 @@
+interface:
+  display_name: "Telegram"
+  short_description: "Keep connected work's communication in Telegram"
+  default_prompt: "Use $telegram and $collaborative-work to verify resource-owner authority and deliver appropriate questions, updates and results to the connected chat."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Collaborative Work"
+  short_description: "Project delegation and resource-owner approvals"
+  default_prompt: "Use $collaborative-work to verify delegated authority, protect private resources, and obtain the correct owner approval before sensitive actions."

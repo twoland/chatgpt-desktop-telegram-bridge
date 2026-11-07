@@ -1,0 +1,15 @@
+{
+  "expected_bot_username": "ReplaceWithYourBotUsername",
+  "default_private_agent": "assistant",
+  "desktop": {
+    "app_path": "/Applications/Codex.app",
+    "remote_debugging_port": 9229
+  },
+  "agents": {
+    "assistant": {
+      "thread_id": "REPLACE_WITH_EXISTING_LOCAL_THREAD_ID",
+      "title": "Replace with the existing task title",
+      "file_roots": []
+    }
+  }
+}
