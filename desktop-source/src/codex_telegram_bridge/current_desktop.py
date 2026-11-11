@@ -116,9 +116,16 @@ class CurrentDesktopClient(CodexDesktopClient):
         self._readers = {}
 
     async def wait_until_task_index_ready(self):
-        index = await self._eval_json(INDEX_JS)
-        if not isinstance(index, dict) or not index.get("rows"):
-            raise DesktopClientError("The main app's task sidebar is unavailable")
+        # The debug endpoint can appear before the app has rendered its sidebar.
+        # Preserve a bounded wait rather than exiting on that first empty frame.
+        deadline = asyncio.get_running_loop().time() + self._launch_timeout_seconds
+        while True:
+            index = await self._eval_json(INDEX_JS)
+            if isinstance(index, dict) and index.get("rows"):
+                return
+            if asyncio.get_running_loop().time() >= deadline:
+                raise DesktopClientError("The main app's task sidebar is unavailable")
+            await asyncio.sleep(self._poll_interval_seconds)
 
     async def list_threads(self):
         index = await self._eval_json(INDEX_JS) or {}

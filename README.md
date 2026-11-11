@@ -74,6 +74,20 @@ It respects `private/config.toml`'s app path and debugging port, opens the norma
 
 The `.command` launchers are macOS conveniences. For a foreground listener, run `start_telegram_bridge.command`; stop it with `stop_telegram_bridge.command`. Do not run two listeners for one bot. An existing listener is detected using its process lock, not a stale PID file.
 
+## Moving an existing installation
+
+Stop the listener, then move the complete project folder, including ignored `private/` and any `installation.json` receipt. A moved editable Python environment can still point at the old source directory. Reinstall it from the new location:
+
+```sh
+cd /new/path/to/telegram-bridge/desktop-source
+uv sync --locked --extra dev
+cd ..
+```
+
+Update the old installation paths in `private/config.toml`: `telegram.bot_token_file`, `bridge.state_path`, and any explicit log paths. Keep the existing token, routes and delivery state. Run `./desktop-source/.venv/bin/python install_telegram_skill.py` again to repoint the installed helper registry, then start `open_desktop_for_telegram.command`. Keep `private/bridge-id.json` with the installation: it preserves the bridge identity used by existing agent requests. Older installations can recover the same identity from their `installation.json` receipt.
+
+The launcher respects the configured app path and port. If the app is already running without that port, quit it normally after active work finishes, then run the launcher. The listener waits briefly for the task sidebar to render after the local endpoint appears.
+
 ## Routes and groups
 
 See [Group Chat Guide](Group%20Chat%20Guide.md) for adding/removing agents, group membership policy, opt-in message visibility and migrations. Stop the listener before administration, then restart it. Configuration changes never authorize another account, folder or audience by themselves.

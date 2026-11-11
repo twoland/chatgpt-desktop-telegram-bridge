@@ -93,7 +93,13 @@ async def main():
         print("The desktop connection is already enabled.")
         await start_background_bridge()
         return
-    if subprocess.run(["/usr/bin/pgrep", "-x", app.stem], stdout=subprocess.DEVNULL).returncode == 0:
+    # A bundle's process name can be a full path or differ from the app name.
+    # Check its executable directory without matching another app's helpers.
+    processes = subprocess.run(["/bin/ps", "-ww", "-axo", "comm="],
+                               capture_output=True, text=True, check=True)
+    executable_dir = app / "Contents/MacOS"
+    if any(Path(line.strip()).parent == executable_dir
+           for line in processes.stdout.splitlines() if line.strip()):
         print(f"Quit {app.stem} normally after active tasks finish, then run this launcher again. It will reopen the same app and profile.")
         raise SystemExit(1)
     print("Waiting for the shared desktop to be free...")

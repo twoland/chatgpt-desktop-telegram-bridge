@@ -56,7 +56,7 @@ async def test_cold_launch_releases_desktop_before_listener_starts(launcher, mon
     monkeypatch.setattr(module, 'DesktopBooking', lambda owner: SimpleNamespace(hold=hold))
     monkeypatch.setattr(module, 'endpoint_ready', AsyncMock(side_effect=[False, True]))
     monkeypatch.setattr(module, 'start_background_bridge', AsyncMock(side_effect=start_listener))
-    run = Mock(side_effect=[SimpleNamespace(returncode=1), SimpleNamespace(returncode=0)])
+    run = Mock(side_effect=[SimpleNamespace(returncode=0, stdout='/Applications/Other.app/Contents/MacOS/Other\n/Applications/Example Desktop.app/Contents/Frameworks/Helper.app/Contents/MacOS/Helper\n'), SimpleNamespace(returncode=0)])
     monkeypatch.setattr(module.subprocess, 'run', run)
     await module.main()
     assert '--remote-debugging-address=127.0.0.1' in run.call_args.args[0]
@@ -71,11 +71,12 @@ async def test_running_app_without_endpoint_does_not_restart_app(launcher, monke
     module, _, _ = launcher
     monkeypatch.setattr(module, 'endpoint_ready', AsyncMock(return_value=False))
     monkeypatch.setattr(module, 'start_background_bridge', AsyncMock())
-    run = Mock(return_value=SimpleNamespace(returncode=0))
+    run = Mock(return_value=SimpleNamespace(returncode=0, stdout='/Applications/Example Desktop.app/Contents/MacOS/ActualExecutable\n'))
     monkeypatch.setattr(module.subprocess, 'run', run)
     with pytest.raises(SystemExit):
         await module.main()
     assert run.call_count == 1
+    assert run.call_args.args[0] == ['/bin/ps', '-ww', '-axo', 'comm=']
     module.start_background_bridge.assert_not_called()
 
 

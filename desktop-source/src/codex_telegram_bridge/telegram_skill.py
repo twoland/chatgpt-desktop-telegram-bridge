@@ -29,7 +29,26 @@ def _write_private_file(target: Path, content: bytes):
 
 
 def bridge_id(root: Path) -> str:
-    return hashlib.sha256(str(root.resolve()).encode()).hexdigest()[:12]
+    # A paired installation keeps its identity when its folder moves. Existing
+    # agent requests and the optional governance transport still use that ID.
+    root = root.resolve()
+    identity_file = root / "private/bridge-id.json"
+    receipt = root / "installation.json"
+    identity = None
+    if identity_file.is_file():
+        saved = json.loads(identity_file.read_text())
+        if saved.get("version") != 1 or "bridge_id" not in saved:
+            raise ValueError("Invalid saved bridge ID; inspect private/bridge-id.json")
+        identity = saved["bridge_id"]
+    elif receipt.is_file():
+        identity = (json.loads(receipt.read_text()).get("telegram_skill") or {}).get("bridge_id")
+    if identity is not None or identity_file.is_file():
+        if not isinstance(identity, str) or len(identity) != 12 or any(
+            char not in "0123456789abcdef" for char in identity
+        ):
+            raise ValueError("Invalid saved bridge ID; inspect the installation identity before starting")
+        return identity
+    return hashlib.sha256(str(root).encode()).hexdigest()[:12]
 
 
 def install_skill(root: Path, skills_dir: Path) -> Path:
@@ -65,12 +84,16 @@ def install_skill(root: Path, skills_dir: Path) -> Path:
                 raise ValueError("Unrecognized collaborative-work installation; inspect before updating")
         elif collaboration.exists() and any(collaboration.iterdir()):
             raise ValueError("An unmanaged collaborative-work skill already exists; inspect before updating")
+        identity = bridge_id(root)
+        (root / "private").mkdir(mode=0o700, exist_ok=True)
+        _write_private_file(root / "private/bridge-id.json",
+                            (json.dumps({"version": 1, "bridge_id": identity}) + "\n").encode())
         # Install the required dependency before updating its Telegram caller.
         # The marker permits retrying a partially interrupted managed install.
         _write_private_file(marker_path, (json.dumps(MANAGED_IDENTITY) + "\n").encode())
         for name, content in collaboration_contents.items():
             _write_private_file(collaboration / name, content)
-        registry["bridges"][bridge_id(root)] = {"root": str(root)}
+        registry["bridges"][identity] = {"root": str(root)}
         contents["bridges.json"] = (json.dumps(registry, indent=2) + "\n").encode()
         for name, content in contents.items():
             _write_private_file(destination / name, content)

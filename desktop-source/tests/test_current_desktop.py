@@ -371,3 +371,20 @@ async def test_multiline_reply_is_acknowledged_after_serialization(idle_client):
     result = await client._submit_and_wait(TASK, "Paragraph one\n\nParagraph two", {"turn-1"})
     assert result.latest_turn.turn_id == "turn-2"
     client._eval_json.assert_awaited_once()
+
+
+async def test_sidebar_readiness_waits_for_late_render(idle_client):
+    client, _ = idle_client
+    client._eval_json = AsyncMock(side_effect=[None, {'rows': []}, {'rows': [{'id': 'local:' + TASK}]}])
+    await client.wait_until_task_index_ready()
+    assert client._eval_json.await_count == 3
+
+
+async def test_sidebar_readiness_stays_bounded_when_missing(idle_client):
+    client, _ = idle_client
+    client._launch_timeout_seconds = .02
+    client._poll_interval_seconds = .005
+    client._eval_json = AsyncMock(return_value={'rows': []})
+    with pytest.raises(DesktopClientError, match='task sidebar is unavailable'):
+        await client.wait_until_task_index_ready()
+    assert client._eval_json.await_count > 1

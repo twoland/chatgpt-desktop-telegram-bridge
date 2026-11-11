@@ -99,7 +99,7 @@ def test_installed_helper_queues_scoped_idempotent_update_and_reports_receipt(tm
     # Apostrophes, spaces and shell syntax remain literal paths; no shell execution.
     root = bridge(tmp_path / "Owner's $(project)")
     target = install_skill(root, tmp_path / 'skills')
-    private = root / 'private'; private.mkdir()
+    private = root / 'private'; private.mkdir(exist_ok=True)
     route = {'version': 1, 'agents': {'editor': {'thread_id': 'task', 'title': 'Editor'}},
              'groups': {'-1001': {'agent': 'editor', 'all_members': True}}}
     (private / 'chat-routing.json').write_text(json.dumps(route))
@@ -132,3 +132,50 @@ def test_installed_helper_queues_scoped_idempotent_update_and_reports_receipt(tm
     argv[argv.index('--bridge') + 1] = 'unregistered'
     denied = subprocess.run(argv, capture_output=True, text=True, timeout=5)
     assert denied.returncode != 0 and 'Unknown bridge ID' in denied.stderr
+
+
+def test_paired_bridge_move_preserves_identity_and_repoints_registry(tmp_path):
+    first = bridge(tmp_path / 'Original Bridge')
+    identity = bridge_id(first)
+    (first / 'installation.json').write_text(json.dumps({
+        'telegram_skill': {'bridge_id': identity}}))
+    target = install_skill(first, tmp_path / 'skills')
+    moved = tmp_path / 'Moved Bridge'
+    first.rename(moved)
+    assert bridge_id(moved) == identity
+    install_skill(moved, tmp_path / 'skills')
+    registry = json.loads((target / 'bridges.json').read_text())
+    assert registry['bridges'] == {identity: {'root': str(moved)}}
+
+
+@pytest.mark.parametrize('identity', ['../../escape', 'ABCDEF123456', '', 123456789012])
+def test_invalid_saved_bridge_identity_refuses_silent_rebinding(tmp_path, identity):
+    root = tmp_path / 'Bridge'
+    root.mkdir()
+    (root / 'installation.json').write_text(json.dumps({
+        'telegram_skill': {'bridge_id': identity}}))
+    with pytest.raises(ValueError, match='Invalid saved bridge ID'):
+        bridge_id(root)
+
+
+def test_new_installation_persists_identity_before_a_move(tmp_path):
+    root = bridge(tmp_path / 'Original')
+    identity = bridge_id(root)
+    target = install_skill(root, tmp_path / 'skills')
+    saved = root / 'private/bridge-id.json'
+    assert json.loads(saved.read_text()) == {'version': 1, 'bridge_id': identity}
+    assert saved.stat().st_mode & 0o077 == 0
+    moved = tmp_path / 'Moved'
+    root.rename(moved)
+    assert bridge_id(moved) == identity
+    install_skill(moved, tmp_path / 'skills')
+    assert json.loads((target / 'bridges.json').read_text())['bridges'] == {
+        identity: {'root': str(moved)}}
+
+
+def test_invalid_identity_record_does_not_fall_back_to_new_path_id(tmp_path):
+    root = tmp_path / 'Bridge'
+    (root / 'private').mkdir(parents=True)
+    (root / 'private/bridge-id.json').write_text('{"version": 99, "bridge_id": "abcdef123456"}')
+    with pytest.raises(ValueError, match='Invalid saved bridge ID'):
+        bridge_id(root)
