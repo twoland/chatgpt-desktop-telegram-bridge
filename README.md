@@ -116,6 +116,16 @@ Connection liveness and message delivery are different. Desktop contention, an u
 
 The bridge does not promise exactly-once execution across arbitrary crashes or app changes. Unknown delivery is retained for reconciliation; legitimate duplicates can still require operator review. Native permissions and approvals must be answered through their supported interface.
 
+### Usage-limit notifications
+
+The bridge checks the signed-in Codex account every 60 seconds and sends usage-limit warnings to the explicitly paired owner's private Telegram DM. It includes the reported reset time when available, suppresses repeated warnings across restarts, and sends a recovery notice after the service confirms the limit has cleared. This works independently of agent generation and the desktop composer. It never sends account usage details to project groups.
+
+The check uses the documented, read-only [`account/rateLimits/read`](https://developers.openai.com/codex/app-server#6-rate-limits-chatgpt) method through a short-lived Codex app-server process. No conversation is started and no model tokens, earned resets or purchases are used by the check. It uses the configured desktop app's bundled Codex executable, then `codex` on `PATH`; that executable must use the same signed-in account and Codex home as the desktop. You can override it with `bridge.usage_command = ["/path/to/codex", "app-server"]`.
+
+Notifications are enabled by default when `telegram.primary_chat_id` is an explicitly configured private owner chat. Set `bridge.usage_notifications = false` to disable them, or change `bridge.usage_poll_interval_seconds` (default 60, minimum 15). The listener must be running and both services reachable. Unsupported account types, missing limits, failed checks and elapsed reset times do not imply recovery. Explicit service availability takes precedence over a rounded 100% reading; model-specific service limits can still generate a warning.
+
+Notification state is saved in the private bridge state file. Definitely rejected transient Telegram sends retry with exponential backoff and respect `retry_after`; sends with an uncertain outcome are held for inspection instead of risking duplicate alerts. A quota recovery notice does not guarantee that an interrupted agent automatically resumes, and does not refresh a stale desktop view. Saved inputs continue through the existing delivery checks and retry rules.
+
 ### Delivery after a usage quota reset
 
 The desktop can retain an old out-of-usage banner after the account's quota has reset. In that state, Send or Queue stays disabled and the bridge keeps the message saved for retry. A running listener and repeated retries alone do not establish that the desktop can accept input.

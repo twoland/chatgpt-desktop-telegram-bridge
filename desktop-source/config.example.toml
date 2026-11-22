@@ -29,5 +29,9 @@ protocol_log_level = "WARNING"
 log_path = "~/.local/state/codex-telegram-bridge/logs/bridge.log"
 protocol_log_path = "~/.local/state/codex-telegram-bridge/logs/protocol.log"
 console_log = false
+usage_notifications = true
+usage_poll_interval_seconds = 60
+# Optional override; otherwise uses the app bundle, then codex on PATH.
+# usage_command = ["/path/to/codex", "app-server"]
 log_max_bytes = 10485760
 log_backup_count = 7

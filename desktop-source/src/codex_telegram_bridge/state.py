@@ -50,13 +50,14 @@ class ApprovalCleanupMessage:
 
 @dataclass(slots=True)
 class BridgeState:
-    version: int = 6
+    version: int = 7
     telegram_update_offset: int = 0
     next_callback_key: int = 0
     primary_chat_id: int | None = None
     message_bindings: dict[str, str] = field(default_factory=dict)
     threads: dict[str, ThreadState] = field(default_factory=dict)
     approval_cleanup_messages: list[ApprovalCleanupMessage] = field(default_factory=list)
+    usage_notifications: dict[str, Any] = field(default_factory=dict)
 
     @staticmethod
     def load(path: Path) -> "BridgeState":
@@ -86,18 +87,20 @@ class BridgeState:
             )
         cleanup = [ApprovalCleanupMessage(**item) for item in raw.get("approval_cleanup_messages", [])]
         return BridgeState(
-            version=max(6, int(raw.get("version", 1))),
+            version=max(7, int(raw.get("version", 1))),
             telegram_update_offset=int(raw.get("telegram_update_offset", 0)),
             next_callback_key=int(raw.get("next_callback_key", 0)),
             primary_chat_id=raw.get("primary_chat_id"),
             message_bindings={str(k): str(v) for k, v in (raw.get("message_bindings") or {}).items()},
             threads=threads,
             approval_cleanup_messages=cleanup,
+            usage_notifications=dict(raw.get("usage_notifications") or {}),
         )
 
     def save(self, path: Path) -> None:
         payload = {
             "version": self.version,
+            "usage_notifications": self.usage_notifications,
             "telegram_update_offset": self.telegram_update_offset,
             "next_callback_key": self.next_callback_key,
             "primary_chat_id": self.primary_chat_id,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 import tomllib
 from dataclasses import dataclass, field
@@ -52,10 +53,18 @@ class BridgeConfig:
     log_path: Path | None = None
     protocol_log_path: Path | None = None
     console_log: bool = False
+    usage_notifications: bool = True
+    usage_poll_interval_seconds: float = 60
+    usage_command: list[str] | None = None
     log_max_bytes: int = DEFAULT_LOG_MAX_BYTES
     log_backup_count: int = DEFAULT_LOG_BACKUP_COUNT
 
     def __post_init__(self) -> None:
+        if not math.isfinite(self.usage_poll_interval_seconds) or self.usage_poll_interval_seconds < 15:
+            raise ValueError("bridge.usage_poll_interval_seconds must be at least 15 seconds")
+        if self.usage_command is not None and (not isinstance(self.usage_command, list)
+                or not self.usage_command or any(not isinstance(x, str) or not x.strip() for x in self.usage_command)):
+            raise ValueError("bridge.usage_command must be a nonempty command array")
         if self.log_path is None:
             self.log_path = default_log_dir(self.state_path) / "bridge.log"
         if self.protocol_log_path is None:
@@ -123,6 +132,9 @@ def load_config(path: Path | None) -> AppConfig:
         log_path=_expand_path(bridge_raw.get("log_path", log_dir / "bridge.log")),
         protocol_log_path=_expand_path(bridge_raw.get("protocol_log_path", log_dir / "protocol.log")),
         console_log=bool(bridge_raw.get("console_log", False)),
+        usage_notifications=bool(bridge_raw.get("usage_notifications", True)),
+        usage_poll_interval_seconds=float(bridge_raw.get("usage_poll_interval_seconds", 60)),
+        usage_command=bridge_raw.get("usage_command"),
         log_max_bytes=int(bridge_raw.get("log_max_bytes", DEFAULT_LOG_MAX_BYTES)),
         log_backup_count=int(bridge_raw.get("log_backup_count", DEFAULT_LOG_BACKUP_COUNT)),
     )
@@ -167,6 +179,11 @@ protocol_log_level = "DEBUG"
 log_path = "~/.local/state/codex-telegram-bridge/logs/bridge.log"
 protocol_log_path = "~/.local/state/codex-telegram-bridge/logs/protocol.log"
 console_log = false
+# Read-only quota notices go only to an explicitly paired private owner chat.
+usage_notifications = true
+usage_poll_interval_seconds = 60
+# Optional override; otherwise uses the configured app bundle, then codex on PATH.
+# usage_command = ["/path/to/codex", "app-server"]
 log_max_bytes = 10485760
 log_backup_count = 7
 """

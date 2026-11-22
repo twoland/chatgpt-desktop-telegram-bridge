@@ -26,6 +26,7 @@ from .formatting import (
 )
 from .state import ApprovalCleanupMessage, BridgeState, QueuedInput, ThreadState
 from .telegram_api import SentMessage, TelegramApiError, TelegramBotApi
+from .usage_notifications import UsageNotifications
 
 logger = logging.getLogger(__name__)
 
@@ -125,13 +126,16 @@ class BridgeApp:
             bot.get("id"),
         )
 
-        await self._cleanup_stale_approval_messages()
-        await self._sync_all_threads_once()
-
-        self._tasks.add(asyncio.create_task(self._telegram_updates_loop(), name="telegram-updates"))
-        self._tasks.add(asyncio.create_task(self._thread_sync_loop(), name="desktop-thread-sync"))
+        usage = UsageNotifications(self.config, self.state, send=self.telegram.send_message, save=self._save_state)
+        if usage.enabled:
+            self._tasks.add(asyncio.create_task(usage.run(self._shutdown), name="codex-usage-notifications"))
 
         try:
+            await self._cleanup_stale_approval_messages()
+            await self._sync_all_threads_once()
+
+            self._tasks.add(asyncio.create_task(self._telegram_updates_loop(), name="telegram-updates"))
+            self._tasks.add(asyncio.create_task(self._thread_sync_loop(), name="desktop-thread-sync"))
             await self._shutdown.wait()
         finally:
             await self.close()
