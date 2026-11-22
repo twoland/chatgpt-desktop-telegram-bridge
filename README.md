@@ -116,6 +116,12 @@ Connection liveness and message delivery are different. Desktop contention, an u
 
 The bridge does not promise exactly-once execution across arbitrary crashes or app changes. Unknown delivery is retained for reconciliation; legitimate duplicates can still require operator review. Native permissions and approvals must be answered through their supported interface.
 
+### Delivery after a usage quota reset
+
+The desktop can retain an old out-of-usage banner after the account's quota has reset. In that state, Send or Queue stays disabled and the bridge keeps the message saved for retry. A running listener and repeated retries alone do not establish that the desktop can accept input.
+
+Confirm that account usage is available again, stop only the bridge listener, and preserve any unsent drafts before refreshing the desktop app view. If a normal app restart is needed, finish active work first and reopen it through `open_desktop_for_telegram.command` to retain the local connection port. Verify the registered conversation and its draft after refresh, then restart the listener. Its saved queue will reconcile accepted messages and retry the unsent draft; check the actual receipt instead of resending the Telegram message. Refreshing the view does not redeem a usage-reset credit or buy additional credits.
+
 ## Security and limitations
 
 See [SECURITY.md](SECURITY.md). The local debugging endpoint must stay on loopback; do not expose it to a LAN or the internet. A process with access to it can control the logged-in desktop app. The bridge also reads registered local transcripts, so its OS account needs only the access you intend to grant.
