@@ -27,6 +27,55 @@ def test_backoff_is_exponential_capped_and_honors_retry_after():
     assert retry_delay(1, 45) == 45
 
 
+async def test_missing_sidebar_task_notifies_once_waits_and_recovers_after_restart(app, monkeypatch):
+    from codex_telegram_bridge.desktop_client import DesktopTaskNotVisibleError
+    monkeypatch.setattr('codex_telegram_bridge.retry_delivery.time.time', lambda: 100)
+    app.desktop.send_message = AsyncMock(side_effect=DesktopTaskNotVisibleError('not visible'))
+    await app._handle_telegram_message(message('/ask Continue'))
+    thread = app.state.threads['task-a']; job = thread.queued_inputs[0]
+    original = job.text
+    assert job.phase == 'awaiting_task' and job.attempts == 0 and job.next_attempt_at == 160
+    assert 'sidebar' in app.telegram.send_message.call_args.kwargs['text']
+    app.telegram.send_message.assert_awaited_once()
+    await app._attempt_queued_input(thread)
+    app.desktop.send_message.assert_awaited_once()
+    for _ in range(10):
+        job.next_attempt_at = 0
+        await app._attempt_queued_input(thread)
+    assert job.attempts == 0 and job.text == original
+    app.state = BridgeState.load(app.config.bridge.state_path)
+    thread = app.state.threads['task-a']; thread.queued_inputs[0].next_attempt_at = 0
+    await app._attempt_queued_input(thread)
+    app.telegram.send_message.assert_awaited_once()
+    async def selected(task, text, **kwargs):
+        return received(text)
+    app.desktop.send_message.side_effect = selected
+    thread.queued_inputs[0].next_attempt_at = 0
+    await app._attempt_queued_input(thread)
+    assert not thread.queued_inputs
+    assert thread.input_receipts['-1001:10']['status'] == 'confirmed'
+
+
+async def test_missing_sidebar_does_not_make_uncertain_input_sendable(app):
+    from codex_telegram_bridge.desktop_client import DesktopTaskNotVisibleError
+    thread = app.state.get_or_create_thread('task-a')
+    app.state.bind_message(-1001, 10, 'task-a')
+    job = QueuedInput(-1001, 10, 'Telegram sender: "User"\nMessage:\nContinue', phase='verify')
+    thread.queued_inputs = [job]
+    app.desktop.supports_native_queue = True
+    app.desktop.send_message = AsyncMock()
+    app.desktop.read_native_queue = AsyncMock(side_effect=DesktopTaskNotVisibleError('not visible'))
+    await app._attempt_queued_input(thread)
+    assert job.phase == 'verify' and job.attempts == 0
+    app.desktop.send_message.assert_not_called()
+    app.desktop.read_native_queue.side_effect = None
+    app.desktop.read_native_queue.return_value = []
+    job.next_attempt_at = 0
+    await app._attempt_queued_input(thread)
+    app.desktop.send_message.assert_not_called()
+    assert job.phase == 'verify'
+
+
 async def test_startup_connection_retries_transient_errors_then_connects(app):
     bot = {'id':9000, 'username':'test_bot'}
     app._bot_id = None

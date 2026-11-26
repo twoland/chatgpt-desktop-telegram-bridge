@@ -142,6 +142,18 @@ async def test_existing_draft_blocks_switch(log):
         await client.close()
 
 
+async def test_missing_sidebar_row_has_specific_error_and_never_inserts_text(idle_client):
+    from codex_telegram_bridge.desktop_client import DesktopTaskNotVisibleError
+    client, _ = idle_client
+    client._current_thread_id = AsyncMock(return_value='another-task')
+    client.read_composer_state = AsyncMock(return_value={'ok': True, 'text': ''})
+    client._eval_json = AsyncMock(return_value={'ok': False})
+    client._call_cdp = AsyncMock()
+    with pytest.raises(DesktopTaskNotVisibleError, match='sidebar'):
+        await client.activate_thread(TASK)
+    client._call_cdp.assert_not_called()
+
+
 @pytest.mark.skipif(shutil.which('node') is None, reason='Node is needed for the editor script')
 @pytest.mark.parametrize('text,missing', [('', False), ('Actual unsent text', False), ('First\nSecond', False), ('\ufffc', False), ('', True)])
 async def test_editor_document_excludes_suggestions_and_preserves_real_drafts(idle_client, text, missing):

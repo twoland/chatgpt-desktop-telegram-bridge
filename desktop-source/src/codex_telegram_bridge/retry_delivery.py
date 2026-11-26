@@ -9,7 +9,7 @@ from pathlib import Path
 from contextvars import ContextVar
 
 from .current_desktop import CurrentDesktopClient, matches_submitted_text, normalized_editor_text
-from .desktop_client import DesktopClientError, DesktopBusyError, DesktopDraftConflictError, DesktopQueueModeError, DesktopQueuedReceipt, DesktopSendUnconfirmedError, DesktopTurn
+from .desktop_client import DesktopTaskNotVisibleError, DesktopClientError, DesktopBusyError, DesktopDraftConflictError, DesktopQueueModeError, DesktopQueuedReceipt, DesktopSendUnconfirmedError, DesktopTurn
 from .formatting import render_markdown_chunks
 from .state import QueuedInput
 from .telegram_api import SentMessage, TelegramApiError
@@ -191,6 +191,27 @@ class RetryDeliveryMixin:
                 await self._defer_input(thread, job, 'confirmation pending', increment=False)
                 return
             await self._confirm_input(thread, job, conversation, match)
+        except DesktopTaskNotVisibleError:
+            if attempt_counted:
+                job.attempts -= 1
+            # A previous uncertain click still requires reconciliation; showing
+            # the task again must never make that input eligible for a new send.
+            if job.phase != 'verify':
+                job.phase = 'awaiting_task'
+            job.next_attempt_at = time.time() + 60
+            if not job.notice_sent:
+                job.notice_sent = True
+                await self._save_state()
+                logger.warning('Input saved; registered task is not visible in the sidebar (task=%s, message=%s)',
+                               thread.thread_id, input_key(job))
+                sent = await self._send_with_reply_mode(thread, source_message_id=job.message_id,
+                    send=lambda target: self._safe_send_message(chat_id=job.chat_id, reply_to_message_id=target,
+                        text='Your message is saved, but the bridge cannot select the assigned agent in the desktop sidebar. '
+                             'Open that agent in the desktop app or make its sidebar entry visible. '
+                             'Delivery will retry automatically; no need to resend.'))
+                if sent:
+                    self.state.bind_message_reference(sent.chat_id, sent.message_id, thread.thread_id)
+            await self._save_state()
         except DesktopDraftConflictError as exc:
             if attempt_counted:
                 job.attempts -= 1

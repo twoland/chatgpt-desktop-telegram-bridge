@@ -126,6 +126,10 @@ Notifications are enabled by default when `telegram.primary_chat_id` is an expli
 
 Notification state is saved in the private bridge state file. Definitely rejected transient Telegram sends retry with exponential backoff and respect `retry_after`; sends with an uncertain outcome are held for inspection instead of risking duplicate alerts. A quota recovery notice does not guarantee that an interrupted agent automatically resumes, and does not refresh a stale desktop view. Saved inputs continue through the existing delivery checks and retry rules.
 
+### Agent missing from the desktop sidebar
+
+The input adapter selects registered tasks through their visible sidebar entries. A collapsed, filtered or otherwise unrendered task can prevent delivery while Telegram and the desktop connection remain online. The bridge keeps the message, sends one specific notice, and waits 60 seconds between selection retries without counting them as failed sends. Open the assigned agent or make its sidebar entry visible. Previously uncertain submissions remain in reconciliation; opening the task does not authorize a duplicate send.
+
 ### Delivery after a usage quota reset
 
 The desktop can retain an old out-of-usage banner after the account's quota has reset. In that state, Send or Queue stays disabled and the bridge keeps the message saved for retry. A running listener and repeated retries alone do not establish that the desktop can accept input.

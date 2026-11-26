@@ -9,7 +9,7 @@ import html
 from pathlib import Path
 
 from .desktop_client import (
-    CodexDesktopClient, DesktopClientError, DesktopConversationSummary,
+    CodexDesktopClient, DesktopClientError, DesktopConversationSummary, DesktopTaskNotVisibleError,
     DesktopDraftConflictError, DesktopSendUnconfirmedError,
     DesktopQueuedReceipt, DesktopQueueModeError, DesktopTurn,
     _raise_if_thread_turn_is_active,
@@ -189,7 +189,7 @@ class CurrentDesktopClient(CodexDesktopClient):
               matches[0].click(); return {ok:true};
             })()""")
             if not clicked or not clicked.get("ok"):
-                raise DesktopClientError("Registered task is not uniquely visible in the sidebar")
+                raise DesktopTaskNotVisibleError("Registered task is not uniquely visible in the sidebar")
         deadline = asyncio.get_running_loop().time() + self._launch_timeout_seconds
         while asyncio.get_running_loop().time() < deadline:
             if await self._current_thread_id() == thread_id:

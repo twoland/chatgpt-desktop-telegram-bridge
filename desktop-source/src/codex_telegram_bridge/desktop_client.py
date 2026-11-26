@@ -42,6 +42,10 @@ class DesktopClientError(RuntimeError):
     pass
 
 
+class DesktopTaskNotVisibleError(DesktopClientError):
+    """The registered task cannot be selected through the visible sidebar."""
+
+
 class DesktopBusyError(DesktopClientError):
     """The shared desktop is booked; no input was attempted."""
 
