@@ -8,9 +8,7 @@ from pathlib import Path
 
 import httpx
 from codex_telegram_bridge.config import DesktopConfig, load_config
-from codex_telegram_bridge.desktop_booking import DesktopBooking
 from codex_telegram_bridge.desktop_client import is_main_app_target
-from codex_telegram_bridge.local_mode import relay_owner
 
 ROOT = Path(__file__).resolve().parent
 
@@ -102,18 +100,18 @@ async def main():
            for line in processes.stdout.splitlines() if line.strip()):
         print(f"Quit {app.stem} normally after active tasks finish, then run this launcher again. It will reopen the same app and profile.")
         raise SystemExit(1)
-    print("Waiting for the shared desktop to be free...")
-    async with DesktopBooking(relay_owner(ROOT)).hold():
-        subprocess.run(["/usr/bin/open", "-a", str(app), "--args",
-                        "--remote-debugging-address=127.0.0.1", f"--remote-debugging-port={port}"], check=True)
-        for _ in range(25):
-            if await endpoint_ready(port):
-                print("Local desktop endpoint ready.")
-                break
-            await asyncio.sleep(1)
-        else:
-            raise RuntimeError("The app did not expose the local endpoint; live compatibility remains unverified")
-    # Release the shared desktop before starting message delivery.
+    # Background app launch does not click, type, or take the foreground. Do not
+    # couple listener startup to a UI worker's cooperative desktop lease.
+    print("Opening the desktop connection in the background...")
+    subprocess.run(["/usr/bin/open", "-g", "-a", str(app), "--args",
+                    "--remote-debugging-address=127.0.0.1", f"--remote-debugging-port={port}"], check=True)
+    for _ in range(25):
+        if await endpoint_ready(port):
+            print("Local desktop endpoint ready.")
+            break
+        await asyncio.sleep(1)
+    else:
+        raise RuntimeError("The app did not expose the local endpoint; live compatibility remains unverified")
     await start_background_bridge()
 
 

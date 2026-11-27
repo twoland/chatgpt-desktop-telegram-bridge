@@ -49,6 +49,8 @@ If no board system exists, and you have verified nobody is using the desktop, cr
 
 This refuses to overwrite an existing board or replace an installed board CLI. Every other desktop user must also follow its claims/reservations/releases. It is cooperative coordination, not an OS security boundary. A missing or ambiguous board stops desktop input.
 
+Background app and listener startup do not wait for the desktop board. Only operations that navigate, type or click in the app acquire a short desktop booking. For the legacy Markdown board, the bridge can retire a claim and obsolete reservations only when the kernel confirms that their timestamps precede the current macOS boot. A missed finish estimate never expires a same-boot claim. Unknown timestamps fail closed, future reservations survive, and an installed board CLI manages its own leases.
+
 ### Complete each agent's setup
 
 Pin each registered conversation in the desktop app and keep the Pinned section visible and expanded. With project grouping, a collapsed project can hide a registered conversation from the input adapter even though the conversation is running. Do not rely on leaving only one connected agent open.

@@ -1,7 +1,6 @@
 import fcntl
 import importlib.util
 import subprocess
-from contextlib import asynccontextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -37,34 +36,26 @@ async def test_ready_desktop_still_starts_missing_listener(launcher, monkeypatch
     run.assert_not_called()
 
 
-async def test_cold_launch_releases_desktop_before_listener_starts(launcher, monkeypatch):
-    module, _, _ = launcher
-    held = False
-
-    @asynccontextmanager
-    async def hold():
-        nonlocal held
-        held = True
-        try:
-            yield
-        finally:
-            held = False
-
-    async def start_listener():
-        assert not held
-
-    monkeypatch.setattr(module, 'DesktopBooking', lambda owner: SimpleNamespace(hold=hold))
+async def test_cold_launch_ignores_busy_desktop_and_opens_without_focus(launcher, monkeypatch):
+    module, root, _ = launcher
+    # Startup must work even if the shared board is BUSY or unreadable. Only
+    # actual UI delivery should book the desktop.
+    (root / 'desktop-control.md').write_text('Status: BUSY\nOwner: other-worker\n')
+    booking = Mock(side_effect=AssertionError('Startup must not access the desktop booking'))
+    monkeypatch.setattr(module, 'DesktopBooking', booking, raising=False)
     monkeypatch.setattr(module, 'endpoint_ready', AsyncMock(side_effect=[False, True]))
-    monkeypatch.setattr(module, 'start_background_bridge', AsyncMock(side_effect=start_listener))
+    monkeypatch.setattr(module, 'start_background_bridge', AsyncMock())
     run = Mock(side_effect=[SimpleNamespace(returncode=0, stdout='/Applications/Other.app/Contents/MacOS/Other\n/Applications/Example Desktop.app/Contents/Frameworks/Helper.app/Contents/MacOS/Helper\n'), SimpleNamespace(returncode=0)])
     monkeypatch.setattr(module.subprocess, 'run', run)
     await module.main()
+    assert run.call_args.args[0][:3] == ['/usr/bin/open', '-g', '-a']
     assert '--remote-debugging-address=127.0.0.1' in run.call_args.args[0]
     assert '--remote-debugging-port=9237' in run.call_args.args[0]
     assert '/Applications/Example Desktop.app' in run.call_args.args[0]
     module.endpoint_ready.assert_awaited_with(9237)
     module.start_background_bridge.assert_awaited_once()
-    assert not held
+    booking.assert_not_called()
+    assert (root / 'desktop-control.md').read_text() == 'Status: BUSY\nOwner: other-worker\n'
 
 
 async def test_running_app_without_endpoint_does_not_restart_app(launcher, monkeypatch):

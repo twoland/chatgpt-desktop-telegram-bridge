@@ -9,7 +9,7 @@ from codex_telegram_bridge.current_desktop import matches_submitted_text
 from codex_telegram_bridge.desktop_client import DesktopClientError, DesktopDraftConflictError, DesktopSendUnconfirmedError, DesktopRequest
 from codex_telegram_bridge.formatting import render_markdown_chunks
 from codex_telegram_bridge.local_mode import telegram_prompt
-from codex_telegram_bridge.retry_delivery import retry_delay
+from codex_telegram_bridge.retry_delivery import desktop_failure_reason, retry_delay
 from codex_telegram_bridge.state import BridgeState, QueuedInput
 from codex_telegram_bridge.telegram_api import SentMessage, TelegramApiError, TelegramBotApi
 from test_bridge import make_conversation, make_turn
@@ -25,6 +25,20 @@ def received(text, turn_id='received', status='inProgress'):
 def test_backoff_is_exponential_capped_and_honors_retry_after():
     assert [retry_delay(i) for i in range(1, 10)] == [2, 4, 8, 16, 32, 60, 60, 60, 60]
     assert retry_delay(1, 45) == 45
+
+
+def test_desktop_failure_reason_exposes_only_fixed_ui_codes():
+    assert desktop_failure_reason(DesktopClientError(
+        'Draft was not sent: send-not-ready; it remains in the desktop task'
+    )) == 'DesktopClientError:send-not-ready'
+    assert desktop_failure_reason(DesktopClientError(
+        'Draft was not sent: missing-editor-document'
+    )) == 'DesktopClientError:missing-editor-document'
+    for detail in ['Private unsent draft', 'Draft was not sent: private text',
+                   'Draft was not sent: private-secret',
+                   'Draft was not sent: send-not-ready; private data']:
+        assert desktop_failure_reason(DesktopClientError(detail)) == 'DesktopClientError'
+    assert desktop_failure_reason(OSError('private path')) == 'OSError'
 
 
 async def test_missing_sidebar_task_notifies_once_waits_and_recovers_after_restart(app, monkeypatch):

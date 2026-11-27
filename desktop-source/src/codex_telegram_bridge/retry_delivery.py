@@ -27,6 +27,22 @@ def input_key(job):
     return f'{job.chat_id}:{job.message_id}'
 
 
+def desktop_failure_reason(exc):
+    """Keep fixed UI error codes useful without logging drafts or exception data."""
+    reason = type(exc).__name__
+    if isinstance(exc, DesktopClientError):
+        match = re.fullmatch(
+            r'Draft was not sent: ([a-z][a-z0-9-]*)(?:; it remains in the desktop task)?',
+            str(exc),
+        )
+        if match and match.group(1) in {
+            'composer-updating', 'send-not-ready', 'missing-editor-document',
+            'composer-unavailable', 'choose-queue-follow-up-behavior-in-app-settings',
+        }:
+            reason += ':' + match.group(1)
+    return reason
+
+
 class RetryDeliveryMixin:
     def _reply_source(self, thread, fallback):
         context = OUTPUT.get()
@@ -268,7 +284,7 @@ class RetryDeliveryMixin:
             job.desktop_wait_since = 0
             if isinstance(exc, DesktopSendUnconfirmedError):
                 job.phase = 'verify'
-            await self._defer_input(thread, job, type(exc).__name__, increment=not attempt_counted)
+            await self._defer_input(thread, job, desktop_failure_reason(exc), increment=not attempt_counted)
         finally:
             self._threads_with_send_in_flight.discard(thread.thread_id)
 

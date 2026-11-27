@@ -651,12 +651,30 @@ class LocalBridgeApp(DeliveryReactionsMixin, TypingIndicatorMixin, RetryDelivery
         return bool(sent)
 
 
+def build_local_diagnostic_client(config):
+    routing = ChatRouting.load(
+        config.telegram.primary_chat_id,
+        config.bridge.state_path.parent / "chat-routing.json",
+    )
+    return SharedDesktopClient(
+        booking_owner=relay_owner(config.bridge.state_path.parent.parent),
+        allowed_thread_ids=routing.titles,
+        task_titles=routing.titles,
+        app_path=config.desktop.app_path,
+        remote_debugging_port=config.desktop.remote_debugging_port,
+        user_data_dir=config.desktop.user_data_dir,
+        launch_timeout_seconds=config.desktop.launch_timeout_seconds,
+        send_ack_timeout_seconds=config.desktop.send_ack_timeout_seconds,
+        poll_interval_seconds=config.desktop.poll_interval_seconds,
+    )
+
+
 def main():
     import os
     from . import cli, diagnostics
     os.umask(0o077)
     cli.BridgeApp = LocalBridgeApp
-    diagnostics.CodexDesktopClient = SharedDesktopClient
+    diagnostics.build_desktop_client = build_local_diagnostic_client
     cli.main()
 
 

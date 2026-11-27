@@ -7,14 +7,43 @@ import json
 import os
 import re
 import subprocess
+import sys
 from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 
 class BoardError(RuntimeError):
     pass
+
+
+@lru_cache(maxsize=1)
+def host_boot_time():
+    """Read the kernel's boot boundary; elapsed lease estimates are not expiry."""
+    if sys.platform != "darwin":
+        return None
+    try:
+        result = subprocess.run(
+            ["/usr/sbin/sysctl", "-n", "kern.boottime"],
+            capture_output=True, text=True, timeout=2, check=True,
+        )
+        match = re.match(r"\{\s*sec\s*=\s*(\d+),\s*usec\s*=\s*(\d+)\s*\}", result.stdout)
+        if not match or not 0 <= int(match[2]) < 1_000_000:
+            return None
+        boot = datetime.fromtimestamp(int(match[1]), timezone.utc).replace(microsecond=int(match[2]))
+        return boot if boot <= datetime.now(timezone.utc) else None
+    except (OSError, subprocess.SubprocessError, ValueError, OverflowError):
+        return None
+
+
+def aware_timestamp(value):
+    try:
+        timestamp = datetime.fromisoformat(value)
+        return timestamp if timestamp.tzinfo is not None else None
+    except ValueError:
+        return None
 
 
 LEGACY_BOARD = """# Desktop Control
@@ -160,10 +189,59 @@ class DesktopBooking:
         temporary.chmod(self.board.stat().st_mode & 0o777)
         temporary.replace(self.board)
 
+    def recover_before_boot(self, text):
+        """Under the edit lock, retire only coordination state from a prior boot.
+
+        A timeout or missed estimate never authorizes taking another owner's
+        desktop. A verified host reboot does: no prior-boot UI operation survived.
+        Keep scheduled windows that still extend beyond boot and ambiguous rows.
+        Installed board CLI leases remain exclusively under that CLI's control.
+        """
+        boot = host_boot_time()
+        if boot is None:
+            return text
+        status, owner = self.field(text, "Status"), self.field(text, "Owner")
+        recovering_claim = False
+        if status == "BUSY":
+            started = aware_timestamp(self.field(text, "Started"))
+            recovering_claim = started is not None and started < boot and owner not in {"none", "—", ""}
+        elif status != "FREE" or owner not in {"none", "—", ""}:
+            return text
+        # Updated is board-wide: a new waiter's reservation can update it even
+        # while the held claim itself still dates from the previous boot.
+        rows = self.reservations(text)
+        removed = 0
+        for line, cells in rows:
+            requested = aware_timestamp(cells[0])
+            if requested is None or requested >= boot:
+                continue
+            expired = cells[2] == "NEXT"
+            if not expired:
+                window = cells[2].split("/")
+                if len(window) == 2:
+                    start, end = [aware_timestamp(v.strip()) for v in window]
+                    expired = start is not None and end is not None and start < end <= boot
+            if expired:
+                text = text.replace(line + "\n", "", 1)
+                removed += 1
+        if recovering_claim:
+            self.write(text, f"Recovered prior-boot desktop coordination; previous owner {owner}; "
+                       f"removed {removed} obsolete reservations; kernel boot {boot.isoformat()}.",
+                       Status="FREE", Owner="none", Task="none", Apps="none", Started="none",
+                       **{"Expected finish": "none"})
+            return self.board.read_text()
+        if removed:
+            # Pruning obsolete queue entries must never release a live or
+            # unverifiable claim, including one with an elapsed finish estimate.
+            self.write(text, f"Removed {removed} prior-boot desktop reservations; current claim preserved.")
+            return self.board.read_text()
+        return text
+
     def try_claim(self):
         if self.uses_cli():
             return self.try_claim_cli()
         with self.edit() as text:
+            text = self.recover_before_boot(text)
             status = self.field(text, "Status")
             owner = self.field(text, "Owner")
             if status not in {"BUSY", "FREE"}:

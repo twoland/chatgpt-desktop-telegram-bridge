@@ -33,7 +33,10 @@ Updated: never
 
 
 @pytest.fixture
-def booking(tmp_path):
+def booking(tmp_path, monkeypatch):
+    # These cases test lease/queue semantics within one boot. Reboot recovery
+    # has its own explicit kernel-boundary fixtures in test_desktop_reboot.
+    monkeypatch.setattr('codex_telegram_bridge.desktop_booking.host_boot_time', lambda: None)
     (tmp_path / "desktop-control.md").write_text(BOARD)
     return DesktopBooking("test-task /relay", tmp_path)
 
