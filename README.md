@@ -51,6 +51,8 @@ This refuses to overwrite an existing board or replace an installed board CLI. E
 
 ### Complete each agent's setup
 
+Pin each registered conversation in the desktop app and keep the Pinned section visible and expanded. With project grouping, a collapsed project can hide a registered conversation from the input adapter even though the conversation is running. Do not rely on leaving only one connected agent open.
+
 Have the connected agent read both installed skills. Record who owns the host/accounts, who may direct project work and what still requires owner approval. Group task access does not grant payment, private-account, publication or destructive-action authority.
 
 Before declaring setup ready, choose a dedicated outgoing folder and obtain the owner's approval of its exact absolute path **and destination chat**, including visibility to every group member. Stop the listener before changing routes, then configure and inspect it:
@@ -60,7 +62,7 @@ Before declaring setup ready, choose a dedicated outgoing folder and obtain the 
 ./desktop-source/.venv/bin/python manage_chat_routes.py list
 ```
 
-Restart and send a genuine request from that chat. Return a harmless file in a final answer as an absolute local-file Markdown link; verify Telegram receives a downloadable attachment with the expected contents. Text delivery alone does not verify file setup. The progress helper sends text, not attachments.
+Restart and send a genuine request from that chat. Return a harmless file in a final answer as an absolute local-file Markdown link; verify Telegram receives a downloadable attachment with the expected contents. Text delivery alone does not verify file setup. The progress helper sends text, not attachments. Then select a different conversation in the desktop app and send another genuine Telegram request to the configured agent. Verify that the bridge selects the correct conversation and that the original input is confirmed there; a saved/queued reaction alone is insufficient. Repeat for each connected agent.
 
 ### Start
 
